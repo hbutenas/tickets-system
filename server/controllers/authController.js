@@ -89,6 +89,7 @@ const verifyUser = async (req, res) => {
         .status(StatusCodes.BAD_REQUEST)
         .json({ message: 'Please provide valid verification code' });
     }
+
     // Update user if find existing one
     await pool.query(
       'UPDATE users SET verification_code = $1, user_verified = $2, verification_date = $3 WHERE user_id = $4',
