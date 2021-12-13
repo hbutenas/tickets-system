@@ -1,10 +1,9 @@
 require('dotenv').config();
+const express = require('express');
+const app = express();
 
 // Routers
 const authRouter = require('./routes/authRouter');
-
-const express = require('express');
-const app = express();
 
 // packages
 const morgan = require('morgan');
