@@ -2,7 +2,7 @@ const pool = require('../database/connectDB');
 const { StatusCodes } = require('http-status-codes');
 const validator = require('email-validator');
 const bcrypt = require('bcryptjs');
-const attachCookiesToResponse = require('../utils/jwt');
+const { attachCookiesToResponse } = require('../utils/jwt');
 
 const register = async (req, res) => {
   const { username, email, firstname, lastname, password } = req.body;
@@ -100,32 +100,35 @@ const verifyUser = async (req, res) => {
   }
 };
 
+// reikia daryt logina su email, nes jie unique turi but, nes kai searchina db pagauna ne verified useri ir throwina errorus
+
 const login = async (req, res) => {
-  const { username, password } = req.body;
+  const { email, password } = req.body;
   try {
     // If passed empty value
-    if (!username || !password) {
+    if (!email || !password) {
       res
         .status(StatusCodes.BAD_REQUEST)
-        .json({ message: 'Please provide username and password' });
+        .json({ message: 'Please provide email and password' });
     }
 
-    const user = await pool.query('SELECT * FROM users WHERE username = $1', [
-      username,
+    const user = await pool.query('SELECT * FROM users WHERE email = $1', [
+      email,
     ]);
 
-    // If couldn't find any user with provided username
+    // If couldn't find any user with provided email
     if (user.rows.length === 0) {
       res
         .status(StatusCodes.BAD_REQUEST)
-        .json({ message: 'Invalid username or password' });
+        .json({ message: 'Invalid email or password' });
     }
     // Is account activated?
     // Keep the same message for security purposes
     if (!user.rows[0].user_verified) {
-      res
-        .status(StatusCodes.BAD_REQUEST)
-        .json({ message: 'Invalid username or password' });
+      res.status(StatusCodes.BAD_REQUEST).json({
+        message:
+          'Please verify your account, verification code is sent to provided email address',
+      });
     }
 
     const isPasswordMatching = await bcrypt.compare(
@@ -136,7 +139,7 @@ const login = async (req, res) => {
     if (!isPasswordMatching) {
       res
         .status(StatusCodes.BAD_REQUEST)
-        .json({ message: 'Invalid username or password' });
+        .json({ message: 'Invalid email or password' });
     }
 
     const payLoad = {

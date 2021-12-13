@@ -15,4 +15,7 @@ const attachCookiesToResponse = (res, user) => {
   });
 };
 
-module.exports = attachCookiesToResponse;
+const isTokenValid = (token) => {
+  return jwt.verify(token, process.env.JWT_SECRET);
+};
+module.exports = { attachCookiesToResponse, isTokenValid };

@@ -13,3 +13,13 @@ CREATE TABLE users(
  verification_date DATE DEFAULT NULL
 );
 
+CREATE TABLE tickets(
+ ticket_id SERIAL PRIMARY KEY,
+ user_id SERIAL NOT NULL REFERENCES users(user_id),
+ title VARCHAR(255),
+ description VARCHAR(500),
+ status VARCHAR DEFAULT 'Pending' NOT NULL,
+ priority VARCHAR DEFAULT 'Regular' NOT NULL,
+ solved_by VARCHAR DEFAULT NULL
+);
+
