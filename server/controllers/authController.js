@@ -29,19 +29,8 @@ const register = async (req, res) => {
 
     // count rows in users table, if it's the first user make him owner
     const countUserTableRows = await pool.query('SELECT FROM users');
-    countUserTableRows > 0
+    countUserTableRows.rowCount === 0
       ? (createNewUser = await pool.query(
-          'INSERT INTO users (username, email, firstname, lastname, password, verification_code) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-          [
-            username,
-            email,
-            firstname,
-            lastname,
-            saltedPassword,
-            verificationCode,
-          ]
-        ))
-      : (createNewUser = await pool.query(
           'INSERT INTO users (username, email, firstname, lastname, password, verification_code, role) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
           [
             username,
@@ -52,8 +41,18 @@ const register = async (req, res) => {
             verificationCode,
             'Owner',
           ]
+        ))
+      : (createNewUser = await pool.query(
+          'INSERT INTO users (username, email, firstname, lastname, password, verification_code) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+          [
+            username,
+            email,
+            firstname,
+            lastname,
+            saltedPassword,
+            verificationCode,
+          ]
         ));
-
     /**
      * TODO: NODEMAILER INTEGRATION GOES HERE
      */
