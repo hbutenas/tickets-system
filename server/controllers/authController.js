@@ -100,8 +100,6 @@ const verifyUser = async (req, res) => {
   }
 };
 
-// reikia daryt logina su email, nes jie unique turi but, nes kai searchina db pagauna ne verified useri ir throwina errorus
-
 const login = async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -155,8 +153,17 @@ const login = async (req, res) => {
   }
 };
 
+const logout = async (req, res) => {
+  res.cookie('token', 'logout', {
+    httpOnly: true,
+    expires: new Date(),
+  });
+  res.status(StatusCodes.OK).json({ msg: 'User logged out!' });
+};
+
 module.exports = {
   register,
   verifyUser,
   login,
+  logout,
 };
