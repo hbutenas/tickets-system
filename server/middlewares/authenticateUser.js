@@ -1,11 +1,10 @@
 const { isTokenValid } = require('../utils/jwt');
-const { StatusCodes } = require('http-status-codes');
+const CustomError = require('../errors');
+
 const authenticateUser = async (req, res, next) => {
   const token = req.signedCookies.token;
   if (!token) {
-    res
-      .status(StatusCodes.UNAUTHORIZED)
-      .json({ message: 'Authentication invalid' });
+    throw new CustomError.UnauthenticatedError('Authentication invalid');
   }
   try {
     const { userId, username, email, role } = isTokenValid(token);
@@ -14,9 +13,7 @@ const authenticateUser = async (req, res, next) => {
 
     next();
   } catch (error) {
-    res
-      .status(StatusCodes.UNAUTHORIZED)
-      .json({ message: 'Authentication invalid' });
+    throw new CustomError.UnauthenticatedError('Authentication invalid');
   }
 };
 
