@@ -103,21 +103,19 @@ const login = async (req, res) => {
       'Please verify your account, verification code is sent to provided email address'
     );
   }
+
   // validate password
-  const isPasswordMatching = await bcrypt.compare(
-    password,
-    user.rows[0].password
-  );
+  const isPasswordMatching = await bcrypt.compare(password, user[0].password);
 
   if (!isPasswordMatching) {
     throw new CustomError.BadRequestError('Invalid email or password');
   }
 
   const payLoad = {
-    userId: user.rows[0].user_id,
-    username: user.rows[0].username,
-    email: user.rows[0].email,
-    role: user.rows[0].role,
+    userId: user[0].user_id,
+    username: user[0].username,
+    email: user[0].email,
+    role: user[0].role,
   };
 
   attachCookiesToResponse(res, payLoad);
