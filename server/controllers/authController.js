@@ -7,6 +7,7 @@ const CustomError = require('../errors');
 
 const register = async (req, res) => {
   const { username, email, firstname, lastname, password } = req.body;
+
   // be sure that we are not missing any of these values on register
   if (!username || !email || !firstname || !lastname || !password) {
     throw new CustomError.BadRequestError('Please provide all required values');
@@ -16,67 +17,69 @@ const register = async (req, res) => {
   if (!validator.validate(email)) {
     throw new CustomError.BadRequestError('Please provide valid email address');
   }
-
   // Create verification code which will be sent by email to user
   const verificationCode = Math.random().toString().slice(2, 11);
-
   // Hash password
   const salt = await bcrypt.genSalt(10);
   const saltedPassword = await bcrypt.hash(password, salt);
 
-  // count rows in users table, if it's the first user make him owner
-  const countUserTableRows = await pool.query('SELECT FROM users');
+  // create user array of object
+  let userObject = [
+    {
+      username: username,
+      email: email,
+      firstname: firstname,
+      lastname: lastname,
+      password: saltedPassword,
+      verification_code: verificationCode,
+    },
+  ];
 
-  countUserTableRows.rowCount === 0
-    ? (createNewUser = await pool.query(
-        'INSERT INTO users (username, email, firstname, lastname, password, verification_code, role) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-        [
-          username,
-          email,
-          firstname,
-          lastname,
-          saltedPassword,
-          verificationCode,
-          'Owner',
-        ]
-      ))
-    : (createNewUser = await pool.query(
-        'INSERT INTO users (username, email, firstname, lastname, password, verification_code) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-        [username, email, firstname, lastname, saltedPassword, verificationCode]
-      ));
-  /**
-   * TODO: NODEMAILER INTEGRATION GOES HERE
-   */
+  // count rows in users table
+  const countUsers = await pool.count('user_id').from('users');
+
+  // if we have already 1st user keep it as it is
+  if (countUsers[0].count > 0) {
+    await pool('users').insert(userObject);
+  } else {
+    userObject[0].role = 'Owner';
+    console.log(userObject);
+    await pool('users').insert(userObject);
+  }
+  // TODO: NODEMAILER INTEGRATION GOES HERE
 
   res.status(StatusCodes.CREATED).json({
-    user: createNewUser.rows[0],
+    user: userObject,
   });
 };
 
 const verifyUser = async (req, res) => {
   const { verificationCode } = req.body;
 
+  // be sure that we are not missing verification code before verifying it
   if (!verificationCode) {
     throw new CustomError.BadRequestError('Please provide verification code');
   }
 
-  const findUserWithMatchingCode = await pool.query(
-    'SELECT * FROM users WHERE verification_code  = $1',
-    [verificationCode]
-  );
+  // find user by his passed code
+  let findUserWithMatchingCode = await pool('users').where({
+    verification_code: verificationCode,
+  });
 
-  // If passed invalid value
-  if (findUserWithMatchingCode.rows.length === 0) {
+  // update user, in other scenario throw badrequest error
+  if (findUserWithMatchingCode.length > 0) {
+    await pool('users')
+      .where({ user_id: findUserWithMatchingCode[0].user_id })
+      .update({
+        user_verified: true,
+        verification_code: null,
+        verification_date: new Date(),
+      });
+  } else {
     throw new CustomError.BadRequestError(
       'Please provide valid verification code'
     );
   }
-
-  // Update user if find existing one
-  await pool.query(
-    'UPDATE users SET verification_code = $1, user_verified = $2, verification_date = $3 WHERE user_id = $4',
-    [null, true, new Date(), findUserWithMatchingCode.rows[0].user_id]
-  );
 
   res.status(StatusCodes.OK).json({ message: 'User successfully verified' });
 };
@@ -88,24 +91,19 @@ const login = async (req, res) => {
   if (!email || !password) {
     throw new CustomError.BadRequestError('Please provide all required values');
   }
+  // first find user by email in database, then do other validations
+  const user = await pool('users').where({ email: email });
 
-  const user = await pool.query('SELECT * FROM users WHERE email = $1', [
-    email,
-  ]);
-
-  // If couldn't find any user with provided email
-  if (user.rows.length === 0) {
+  if (user.length === 0) {
     throw new CustomError.BadRequestError('Invalid email or password');
   }
-
-  // Is account activated?
-  // Keep the same message for security purposes
-  if (!user.rows[0].user_verified) {
+  // TODO: If i didn't received verification code? Create a functionality to resend it again
+  if (!user[0].user_verified) {
     throw new CustomError.BadRequestError(
       'Please verify your account, verification code is sent to provided email address'
     );
   }
-
+  // validate password
   const isPasswordMatching = await bcrypt.compare(
     password,
     user.rows[0].password
@@ -121,7 +119,9 @@ const login = async (req, res) => {
     email: user.rows[0].email,
     role: user.rows[0].role,
   };
+
   attachCookiesToResponse(res, payLoad);
+
   res.status(StatusCodes.OK).json({ user: payLoad });
 };
 
