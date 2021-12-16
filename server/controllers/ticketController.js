@@ -1,111 +1,97 @@
 const { StatusCodes } = require('http-status-codes');
 const pool = require('../database/connectDB');
 const checkPermissions = require('../utils/checkPermissions');
+const CustomError = require('../errors');
+
 const createTicket = async (req, res) => {
   const { title, description } = req.body;
 
-  try {
-    if (!title || !description) {
-      res
-        .status(StatusCodes.BAD_REQUEST)
-        .json({ message: 'Please provide all values' });
-    }
-    const ticket = await pool.query(
-      'INSERT INTO tickets(title,description,user_id) VALUES($1,$2,$3) RETURNING *',
-      [title, description, req.user.userId]
-    );
-    res.status(StatusCodes.CREATED).json({ ticket: ticket.rows[0] });
-  } catch (error) {
-    console.error(error.message);
+  if (!title || !description) {
+    throw new CustomError.BadRequestError('Please provide all required values');
   }
+
+  let ticketObject = [
+    {
+      title,
+      description,
+      user_id: req.user.userId,
+    },
+  ];
+
+  const ticket = await pool('tickets').insert(ticketObject).returning('*');
+
+  res.status(StatusCodes.CREATED).json({ ticket });
 };
 
 const getAllTickets = async (req, res) => {
-  try {
-    const tickets = await pool.query('SELECT * FROM tickets');
-    if (tickets.rows.length === 0) {
-      res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: `Currently we don't have any tickets` });
-    }
-    res.status(StatusCodes.OK).json({ tickets: tickets.rows });
-  } catch (error) {
-    console.error(error.message);
+  const tickets = await pool('tickets');
+
+  if (tickets.length === 0) {
+    throw new CustomError.NotFoundError(`Currently we don't have any tickets`);
   }
+
+  res.status(StatusCodes.OK).json({ tickets });
 };
 
 const getSingleTicket = async (req, res) => {
   const { id: ticketId } = req.params;
-  try {
-    const ticket = await pool.query(
-      'SELECT * FROM tickets WHERE ticket_id = $1',
-      [ticketId]
+  // find a ticket by ticket id
+  const ticket = await pool('tickets').where({ ticket_id: ticketId });
+
+  if (ticket.length === 0) {
+    throw new CustomError.NotFoundError(
+      `Ticket with id ${ticketId} does not exists`
     );
-    if (ticket.rows.length === 0) {
-      res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: `Ticket with id ${ticketId} does not exists` });
-    }
-    res.status(StatusCodes.OK).json({ ticket: ticket.rows[0] });
-  } catch (error) {
-    console.error(error.message);
   }
+
+  res.status(StatusCodes.OK).json({ ticket });
 };
+// Whenever I'm updating a product and I i pass one of empty body properties I set it to null on update
 
 const updateTicket = async (req, res) => {
   const { id: ticketId } = req.params;
   const { title, description } = req.body;
-  try {
-    const ticket = await pool.query(
-      'SELECT * FROM tickets WHERE ticket_id = $1',
-      [ticketId]
+
+  // find a ticket by ticket id
+  const ticket = await pool('tickets').where({ ticket_id: ticketId });
+
+  if (ticket.length === 0) {
+    throw new CustomError.NotFoundError(
+      `Ticket with id ${ticketId} does not exists`
     );
-
-    if (ticket.rows.length === 0) {
-      res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: `Ticket with id ${ticketId} does not exists` });
-    }
-
-    // allow only to update tickets only for people who created it or for owner/admin/it_support roles.
-    checkPermissions(res, req.user, ticket.rows[0].user_id);
-
-    await pool.query(
-      'UPDATE tickets SET title = $1, description = $2 WHERE ticket_id = $3',
-      [title, description, ticketId]
-    );
-
-    res
-      .status(StatusCodes.OK)
-      .json({ message: 'Ticket successfully updated!' });
-  } catch (error) {
-    console.error(error.message);
   }
+  // allow only to update tickets only for people who created it or for owner/admin/it_support roles.
+  checkPermissions(res, req.user, ticket[0].user_id);
+
+  // if title or description is passed empty, use the old values from the ticket
+  let updateTicketObject = {
+    title: title || ticket[0].title,
+    description: description || ticket[0].description,
+  };
+
+  const updatedTicket = await pool('tickets')
+    .where({ ticket_id: ticketId })
+    .update(updateTicketObject)
+    .returning('*');
+
+  res.status(StatusCodes.OK).json({ updatedTicket });
 };
 
 const deleteTicket = async (req, res) => {
   const { id: ticketId } = req.params;
-  try {
-    const ticket = await pool.query(
-      'SELECT * FROM tickets WHERE ticket_id = $1',
-      [ticketId]
+
+  const ticket = await pool('tickets').where({ ticket_id: ticketId });
+
+  if (ticket.length === 0) {
+    throw new CustomError.NotFoundError(
+      `Ticket with id ${ticketId} does not exists`
     );
-
-    if (ticket.rows.length === 0) {
-      res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: `Ticket with id ${ticketId} does not exists` });
-    }
-
-    checkPermissions(res, req.user, ticket.rows[0].user_id);
-
-    await pool.query('DELETE FROM tickets WHERE ticket_id = $1', [ticketId]);
-    res
-      .status(StatusCodes.OK)
-      .json({ message: 'Ticket successfully deleted!' });
-  } catch (error) {
-    console.error(error.message);
   }
+  checkPermissions(res, req.user, ticket[0].user_id);
+
+  await pool('tickets').where({ ticket_id: ticketId }).del();
+
+  res.status(StatusCodes.OK).json({ message: 'Ticket successfully deleted!' });
 };
 
 module.exports = {
