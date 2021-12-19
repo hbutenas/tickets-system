@@ -6,6 +6,7 @@ const app = express();
 // Routers
 const authRouter = require('./routes/authRouter');
 const ticketsRouter = require('./routes/ticketsRouter');
+const adminRouter = require('./routes/adminRouter');
 
 // packages
 const morgan = require('morgan');
@@ -22,6 +23,7 @@ app.use(cookieParser(process.env.JWT_SECRET));
 // routes
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/tickets', ticketsRouter);
+app.use('/api/v1/admin', adminRouter);
 
 app.use(routeNotFoundMiddleware);
 app.use(errorHandlerMiddleware);
