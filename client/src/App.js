@@ -1,7 +1,14 @@
 import './App.css';
+import React, { Fragment } from 'react';
 
 function App() {
-  return <h1>Hello World!</h1>;
+  return (
+    <Fragment>
+      <div className='container'>
+        <h1>Hello World2!</h1>
+      </div>
+    </Fragment>
+  );
 }
 
 export default App;
