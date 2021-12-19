@@ -46,7 +46,6 @@ const getSingleTicket = async (req, res) => {
 
   res.status(StatusCodes.OK).json({ ticket });
 };
-// Whenever I'm updating a product and I i pass one of empty body properties I set it to null on update
 
 const updateTicket = async (req, res) => {
   const { id: ticketId } = req.params;
