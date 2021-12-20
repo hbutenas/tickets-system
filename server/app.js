@@ -11,11 +11,13 @@ const adminRouter = require('./routes/adminRouter');
 // packages
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
+const cors = require('cors');
 
 // middlewares
 const routeNotFoundMiddleware = require('./middlewares/routeNotFound');
 const errorHandlerMiddleware = require('./middlewares/errorHandler');
 
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(morgan('tiny'));
 app.use(cookieParser(process.env.JWT_SECRET));
