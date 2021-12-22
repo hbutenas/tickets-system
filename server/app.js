@@ -26,6 +26,9 @@ app.use(cookieParser(process.env.JWT_SECRET));
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/tickets', ticketsRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/', (req, res) => {
+  console.log(new Date());
+});
 
 app.use(routeNotFoundMiddleware);
 app.use(errorHandlerMiddleware);

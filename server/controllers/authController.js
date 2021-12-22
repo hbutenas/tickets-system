@@ -4,7 +4,9 @@ const validator = require('email-validator');
 const bcrypt = require('bcryptjs');
 const { attachCookiesToResponse } = require('../utils/jwt');
 const CustomError = require('../errors');
+const crypto = require('crypto');
 
+// TODO: in the very end make registration only available for Owner/Admin
 const register = async (req, res) => {
   const { username, email, firstname, lastname, password } = req.body;
 
@@ -23,11 +25,15 @@ const register = async (req, res) => {
   const salt = await bcrypt.genSalt(10);
   const saltedPassword = await bcrypt.hash(password, salt);
 
+  // make sure that all emails are saved as lowercase in db
+
+  const lowercaseEmail = email.toLowerCase();
+
   // create user array of object
   let userObject = [
     {
       username: username,
-      email: email,
+      email: lowercaseEmail,
       firstname: firstname,
       lastname: lastname,
       password: saltedPassword,
@@ -43,7 +49,6 @@ const register = async (req, res) => {
     await pool('users').insert(userObject);
   } else {
     userObject[0].role = 'Owner';
-    console.log(userObject);
     await pool('users').insert(userObject);
   }
   // TODO: NODEMAILER INTEGRATION GOES HERE
@@ -91,8 +96,11 @@ const login = async (req, res) => {
   if (!email || !password) {
     throw new CustomError.BadRequestError('Please provide all required values');
   }
+  // lowercase the email
+  const lowercaseEmail = email.toLowerCase();
+
   // first find user by email in database, then do other validations
-  const user = await pool('users').where({ email: email });
+  const user = await pool('users').where({ email: lowercaseEmail });
 
   if (user.length === 0) {
     throw new CustomError.BadRequestError('Invalid email or password');
@@ -114,13 +122,43 @@ const login = async (req, res) => {
   const payLoad = {
     userId: user[0].user_id,
     username: user[0].username,
-    email: user[0].email,
-    role: user[0].role,
   };
 
-  attachCookiesToResponse(res, payLoad);
+  // create refresh token
+  let refreshToken = '';
 
-  res.status(StatusCodes.OK).json({ user: payLoad });
+  // check for already existing token
+  const findExistingToken = await pool('tokens').where(
+    'user_id',
+    user[0].user_id
+  );
+
+  // if we found a match
+  if (findExistingToken.length > 0) {
+    // if the current time is more than expire date
+    if (findExistingToken[0].expires_at.getTime() < new Date()) {
+      throw new CustomError.UnauthenticatedError('Invalid Credentials');
+    }
+    // the token is still valid assign it
+    refreshToken = findExistingToken[0].refresh_token;
+    attachCookiesToResponse(res, payLoad, refreshToken);
+    res.status(StatusCodes.OK).json({ refresh_token: refreshToken });
+    return;
+  }
+
+  // if user didn't had a token
+  const tokenObject = {
+    user_id: user[0].user_id,
+    refresh_token: crypto.randomBytes(40).toString('hex'),
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 3600 * 1000 * 24).toISOString(),
+  };
+
+  await pool('tokens').insert(tokenObject);
+
+  attachCookiesToResponse(res, payLoad, tokenObject.refresh_token);
+
+  res.status(StatusCodes.OK).json({ refresh_token: refreshToken });
 };
 
 const logout = async (req, res) => {

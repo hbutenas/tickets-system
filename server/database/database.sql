@@ -23,3 +23,10 @@ CREATE TABLE tickets(
  solved_by VARCHAR DEFAULT NULL
 );
 
+CREATE TABLE tokens(
+ token_id SERIAL PRIMARY KEY,
+ user_id SERIAL NOT NULL REFERENCES users(user_id),
+ refresh_token VARCHAR(500),
+ created_at DATE NOT NULL,
+ expires_at DATE NOT NULL
+);
